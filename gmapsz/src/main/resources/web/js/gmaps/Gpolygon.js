@@ -79,7 +79,14 @@ gmaps.Gpolygon = zk.$extends(gmaps.Gpolyline, {
 					visible: this._visible
 				},
 			gpolygon = new google.maps.Polygon(opt);
+			
+			google.maps.event.addListener(gpolygon, 'click', function(event) {
+				zAu.send(new zk.Event(gpolygon._wgt, "onClick", gpolygon._wgt.id));
+			});
 
+		google.maps.event.addListener(gpolygon, 'mouseover', function(event) {
+			zAu.send(new zk.Event(gpolygon._wgt, "onMouseOver", gpolygon._wgt.id));
+		});
 		var wgt = this;
 		gpolygon._wgt = this;
 		this.mapitem_ = gpolygon;
