@@ -37,8 +37,10 @@ gmapsGapi.loadAPIs = function(wgt, callback, msg, timeout) {
 		gmapsGapi.waitUntil(wgt, opts);
 		if (!gmapsGapi.LOADING) { //avoid double loading Google Ajax APIs
 			gmapsGapi.LOADING = true;
-			if (!opts.condition())
-				zk.loadScript('https://www.google.com/jsapi');
+			if (!opts.condition()){
+				zk.loadScript('https://www.google.com/jsapi?key='+zk.googleAPIkey);
+//				zk.loadScript('https://www.google.com/jsapi');
+			}
 		}
 	} else
 		callback();
