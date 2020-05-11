@@ -1004,11 +1004,558 @@ gmaps.Gmaps = zk.$extends(zul.Widget, {
 				// used to be {type: G_PHYSICAL_MAP}
 				mapTypeControlOptions: {mapTypeIds: mtids}
 			};
+            this._mapOptions = {
+                    mapTypeControl: true,
+                    mapTypeControlOptions: {
+                        style: google.maps.MapTypeControlStyle.Default,
+                        mapTypeIds: [
+                            google.maps.MapTypeId.ROADMAP,
+                            google.maps.MapTypeId.TERRAIN,
+                            google.maps.MapTypeId.SATELLITE
+                        ]
+                    },
+                    styles: [{
+                        featureType: "transit",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "poi",
+                        elementType: "labels",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.attraction",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.business",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.medical",
+                        stylers: [{
+                                visibility: "off"
+                            },
+                            {
+                                saturation: -29
+                            }
+                        ]
+                    }, {
+                        featureType: "poi.park",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.place_of_worship",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.school",
+                        elementType: "geometry",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.school",
+                        elementType: "labels",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.school",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "poi.sports_complex",
+                        stylers: [{
+                                visibility: "off"
+                            }
+
+                        ]
+                    }, {
+                        featureType: "poi.sports_complex",
+                        elementType: "labels",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "poi.sports_complex",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "off"
+                        }]
+                    }, {
+                        featureType: "transit.station.airport",
+                        stylers: [{
+                                visibility: "on"
+                            }
+
+                        ]
+                    }, {
+                        featureType: "transit.station.airport",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "transit.line",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "road.highway",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "road.highway.controlled_access",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "road.highway.controlled_access",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "road.highway",
+                        elementType: "labels.text",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }, {
+                        featureType: "road.highway",
+                        elementType: "labels.icon",
+                        stylers: [{
+                            visibility: "on"
+                        }]
+                    }]
+                };			
 		}
 		return this._mapOptions;
 	},
 	_initGmaps: function(n) {
 		var maps = new google.maps.Map(n, this.getMapOptions());
+		// INIZIO PATCH
+        var map = maps;
+        var geoJSON;
+        var request;
+        var messageForecast;
+        var newFeatures;
+        var listnerIdleEventHandler;
+        var listnerClickMeteoEventHandler;
+        var featuresid = [];
+        var itemRoute = '';
+        var itemLocality = '';
+        var itemProvince = '';
+        var itemCountry = '';
+        var itemPc = '';
+        var itemSnumber = '';
+        var itemRegion = '';
+
+        //  var infocitywindowopened=false;
+        var gettingData = false;
+        var openWeatherMapKey = "4c221ada1010673cbe28461efdeda448";
+
+        //   google.maps.event.addDomListener(window, "resize", function() {
+        //    var center = map.getCenter();
+        //       var zoom = map.getZoom();
+        //       google.maps.event.trigger(map, "resize");
+        //       map.setCenter(center); 
+        //       map.setZoom(zoom); 
+        //  });
+
+
+        var checkIfDataRequested = function() {
+            // Stop extra requests being sent
+            while (gettingData === true) {
+                request.abort();
+                gettingData = false;
+            }
+            getCoords();
+        };
+        // Get the coordinates from the Map bounds
+        var getCoords = function() {
+
+            var bounds = map.getBounds();
+            var NE = bounds.getNorthEast();
+            var SW = bounds.getSouthWest();
+            //console.log("Coordinate: " + NE.lat() + "-" + NE.lng()+ "-" +SW.lat()+ "-" + SW.lng());
+            //console.log("6");
+            getWeather(NE.lat(), NE.lng(), SW.lat(), SW.lng());
+        };		
+        
+        // Make the weather request
+        var getWeather = function(northLat, eastLng, southLat, westLng) {
+            gettingData = true;
+            messageForecast = "";
+            var requestString = "https://api.openweathermap.org/data/2.5/box/city?bbox=" +
+                westLng + "," + northLat + "," //left top
+                +
+                eastLng + "," + southLat + "," //right bottom
+                +
+                map.getZoom() +
+                "&lang=it&cluster=no" +
+                "&APPID=" + openWeatherMapKey + "&callback=?";
+            $.support.cors = true;
+            $.ajaxSetup({
+                cache: false
+            });
+            request = $.getJSON(requestString, function(data) {
+                try {
+                    if (data && data.list && data.list.length > 0) {
+                        //console.log("risultati trovati: " + data.list.length);
+                        resetData();
+                        for (var i = 0; i < data.list.length; i++) {
+                            geoJSON.features.push(jsonToGeoJson(data.list[i].name, data.list[i],
+                                data.list[i].weather[0].main, data.list[i].weather[0].icon, data.list[i].main.temp,
+                                data.list[i].coord.Lon, data.list[i].coord.Lat));
+                        }
+                        drawIcons(geoJSON);
+                    } else {
+                        //Se sono a livello di strada recupero le coordinate del centro per risalire alla cittÃ  e richiedere le previsioni meteo per essa
+                        var geocoder = new google.maps.Geocoder;
+                        //    if(infocitywindowopened === false){ 
+                        var infocitywindow = new google.maps.InfoWindow();
+                        geocodeLatLng(geocoder, map, infocitywindow);
+                        //    }
+                    }
+                } catch (err) {
+                    //alert(err.message);
+                    //Se sono a livello di strada recupero le coordinate del centro per risalire alla cittÃ  e richiedere le previsioni meteo per essa
+                    var geocoder = new google.maps.Geocoder;
+                    //    if(infocitywindowopened === false){ 
+                    var infocitywindow = new google.maps.InfoWindow();
+                    geocodeLatLng(geocoder, map, infocitywindow);
+                    //    }
+
+                }
+            });
+        };
+
+        function geocodeLatLng(geocoder, map, infocitywindow) {
+            var input = map.getCenter();
+            var latlng = {
+                lat: input.lat(),
+                lng: input.lng()
+            };
+            geocoder.geocode({
+                'location': latlng
+            }, function(results, status) {
+                if (status === google.maps.GeocoderStatus.OK) {
+
+                    itemLocality = '';
+                    itemProvince = '';
+                    itemCountry = '';
+                    itemRegion = '';
+
+                    $.each(results, function(j, result_component) {
+                        var arrAddress = result_component.address_components;
+                        // iterate through address_component array
+                        $.each(arrAddress, function(i, address_component) {
+                            //  if (address_component.types[0] == "route"){
+                            //     console.log(i+": route:"+address_component.long_name);
+                            //    itemRoute = address_component.long_name;
+                            // }
+
+                            if (address_component.types[0] == "locality") {
+                                console.log("town:" + address_component.long_name);
+                                itemLocality = address_component.long_name;
+                            }
+
+                            if (address_component.types[0] == "country") {
+                                console.log("country:" + address_component.short_name);
+                                itemCountry = address_component.short_name;
+                            }
+
+                            if (address_component.types[0] == "administrative_area_level_2") {
+                                console.log("province:" + address_component.long_name);
+                                itemProvince = address_component.long_name;
+                            }
+
+                            if (address_component.types[0] == "administrative_area_level_1") {
+                                console.log("region:" + address_component.long_name);
+                                itemRegion = address_component.long_name;
+                            }
+
+                            //if (address_component.types[0] == "postal_code_prefix"){ 
+                            //    console.log("pc:"+address_component.long_name);  
+                            //   itemPc = address_component.long_name;
+                            //}
+
+                            //if (address_component.types[0] == "street_number"){ 
+                            //    console.log("street_number:"+address_component.long_name);  
+                            //    itemSnumber = address_component.long_name;
+                            // }
+
+                            if (itemLocality && itemLocality.length > 0 && itemProvince && itemProvince.length > 0 && itemCountry && itemCountry.length > 0) {
+                                return false; // break the loop   
+                            }
+                        });
+                        if (itemLocality && itemLocality.length > 0 && itemProvince && itemProvince.length > 0 && itemCountry && itemCountry.length > 0) {
+                            return false; // break the loop   
+                        }
+                    });
+
+                    if (itemProvince && itemProvince.length > 0) {
+                        itemLocality = itemLocality + "," + itemProvince.replace("CittÃ  Metropolitana di ", "");
+                    }
+                    if (itemCountry && itemCountry.length > 0) {
+                        itemLocality = itemLocality + "," + itemCountry;
+                    } else {
+                        itemLocality = itemLocality + ",it";
+                    }
+
+                    if (itemLocality && itemLocality.length > 0) {
+                        var requestString = "https://api.openweathermap.org/data/2.5/forecast?q=" + itemLocality + "&lang=it&APPID=" + openWeatherMapKey + "&callback=?";
+                        $.support.cors = true;
+                        $.ajaxSetup({
+                            cache: false
+                        });
+                        $.getJSON(requestString, function(data) {
+
+                            if (data && data.list.length > 0) {
+                                resetData();
+                                for (var i = 0; i < data.list.length; i++) {
+                                    var icon = data.list[i].weather[0].icon;
+                                    messageForecast += data.list[i].dt_txt.substring(0, data.list[i].dt_txt.length - 2) + " <img src='images/IconeMeteoInfo/" + icon + ".png'" + " >  " + data.list[i].weather[0].main + "<br/>";
+                                    geoJSON.features.push(jsonToGeoJson(data.city.name, data.list[i], data.list[0].weather[0].main, data.list[0].weather[0].icon, data.list[0].main.temp, map.getCenter().lng(), map.getCenter().lat()));
+                                }
+                                drawIcons(geoJSON);
+
+                            }
+                        });
+
+                    }
+                }
+            });
+        }
+        
+        var infowindow = new google.maps.InfoWindow();
+
+        // For each result that comes back, convert the data to geoJSON
+        var jsonToGeoJson = function(cityName, weatherItem, currentWeather, mainIcon, mainTemp, lon, lat) {
+            var feature = {
+                id: weatherItem.id,
+                type: "Feature",
+                properties: {
+                    // city: weatherItem.name,
+                    city: cityName,
+                    id: weatherItem.id,
+                    //weather: weatherItem.weather[0].main,
+                    weather: currentWeather,
+                    //temperature: weatherItem.main.temp,
+                    temperature: mainTemp,
+                    min: weatherItem.main.temp_min,
+                    max: weatherItem.main.temp_max,
+                    humidity: weatherItem.main.humidity,
+                    pressure: weatherItem.main.pressure,
+                    windSpeed: weatherItem.wind.speed,
+                    windDegrees: weatherItem.wind.deg,
+                    windGust: weatherItem.wind.gust,
+                    forecast: messageForecast,
+                    //  icon: "http://openweathermap.org/img/w/"
+                    icon: "images/IconeMeteoInfo/"
+                        //    + weatherItem.weather[0].icon  + ".png",
+                        +
+                        mainIcon + ".png", //"?" + Math.random(),
+                    //  coordinates: [weatherItem.coord.lon, weatherItem.coord.lat]
+                    coordinates: [lon, lat]
+                },
+                geometry: {
+                    type: "Point",
+                    //coordinates: [weatherItem.coord.lon, weatherItem.coord.lat]
+                    coordinates: [lon, lat]
+                }
+            };
+            // Set the custom marker icon
+            map.data.setStyle(function(feature) {
+                return {
+                    icon: {
+                        url: feature.getProperty('icon'),
+                        anchor: new google.maps.Point(25, 25)
+                    }
+                };
+            });
+            // returns object
+            featuresid.push(weatherItem.id);
+            return feature;
+        };
+        // Add the markers to the map
+        var drawIcons = function(weather) {
+            newFeatures = map.data.addGeoJson(geoJSON);
+            // Set the flag to finished
+            gettingData = false;
+        };
+        // Clear data layer and geoJSON
+        var resetData = function() {
+            geoJSON = {
+                type: "FeatureCollection",
+                features: []
+            };
+
+            //if(featuresid  ){
+            // for (var i = 0; i < featuresid.length; i++){
+            //  map.data.remove(map.data.getFeatureById(featuresid[i]));
+            // }
+            // newFeatures[i].setMap(null);
+
+            //}
+
+            map.data.forEach(function(feature) {
+                if (feature)
+                    map.data.remove(feature);
+            });
+
+        };        
+        
+        var showWeatherInfo = function(event) {
+            infowindow.close();
+            
+            infowindow.setContent(
+                //  "<script src='http://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js'></script>" +
+                "<center><img src=" + event.feature.getProperty("icon") + ">" +
+                "<br /><strong>" + event.feature.getProperty("city") + "</strong>" +
+                "<br />" + event.feature.getProperty("temperature") + "&deg;C" +
+                "<br />" + event.feature.getProperty("weather") +
+                "<br /><br /><button id='btnDett' style='background-color: white;'> <img src='images/previsioniMeteo.jpg' alt='Previsioni meteo' ></button>" +
+                "</center>"
+            );
+            infowindow.setOptions({
+                position: {
+                    lat: event.latLng.lat(),
+                    lng: event.latLng.lng()
+                },
+                pixelOffset: {
+                    width: 0,
+                    height: -15
+                }
+            });
+            infowindow.open(map);
+//            content.on('click', '#btnDett' ,
+            document.getElementById("btnDett").addEventListener('click', 
+            		function() {
+                if (event.feature.getProperty("forecast") && event.feature.getProperty("forecast").length > 1) {
+
+                    infowindow.close();
+                    infowindow.setContent(
+                        "<center><img src=" + event.feature.getProperty("icon") + ">" +
+                        "<br /><strong>" + event.feature.getProperty("city") + "</strong>" +
+                        "<br />" + event.feature.getProperty("temperature") + "&deg;C" +
+                        "<br />" + event.feature.getProperty("weather") +
+                        "<br /><div id='result'></div>" +
+                        "</center>"
+                    );
+                    infowindow.open(map);
+                    document.getElementById("result").style.height = "200px";
+                    document.getElementById("result").style.width = "240px";
+                    document.getElementById("result").innerHTML = event.feature.getProperty("forecast");
+                    document.getElementById("result").style.overflowX = "hidden";
+                    document.getElementById("result").style.overflowY = "scroll";
+
+
+                } else {
+                    var requestString = "https://api.openweathermap.org/data/2.5/forecast?id=" + event.feature.getProperty("id") + "&lang=it&APPID=" + openWeatherMapKey + "&callback=?";
+
+                    $.support.cors = true;
+                    $.ajaxSetup({
+                        cache: false
+                    });
+                    $.getJSON(requestString, function(data) {
+                        var allforecast = "";
+                        for (var i = 0; i < data.list.length; i++) {
+                            var icon = data.list[i].weather[0].icon;
+                            allforecast += data.list[i].dt_txt.substring(0, data.list[i].dt_txt.length - 2) + " <img src='images/IconeMeteoInfo/" + icon + ".png" + "' >  " + data.list[i].weather[0].main + "<br/>";
+                        }
+
+                        infowindow.close();
+                        infowindow.setContent(
+                            "<center><img src=" + event.feature.getProperty("icon") + ">" +
+                            "<br /><strong>" + event.feature.getProperty("city") + "</strong>" +
+                            "<br />" + event.feature.getProperty("temperature") + "&deg;C" +
+                            "<br />" + event.feature.getProperty("weather") +
+                            "<br /><div id='result'></div>" +
+                            "</center>"
+                        );
+                        infowindow.open(map);
+                        document.getElementById("result").style.height = "200px";
+                        document.getElementById("result").style.width = "240px";
+                        document.getElementById("result").innerHTML = allforecast;
+                        document.getElementById("result").style.overflowX = "hidden";
+                        document.getElementById("result").style.overflowY = "scroll";
+
+                    });
+                }
+            });
+        };
+
+        function ShowHideWeatherControl(controlDiv, map) {
+            // Set CSS for the control border.
+            var controlUI = document.createElement('div');
+            controlUI.style.backgroundColor = '#fff';
+            controlUI.style.border = '2px solid #fff';
+            controlUI.style.borderRadius = '3px';
+            controlUI.style.boxShadow = '0 2px 6px rgba(0,0,0,.3)';
+            controlUI.style.cursor = 'pointer';
+            controlUI.style.marginBottom = '5px';
+            controlUI.style.textAlign = 'center';
+            controlUI.title = 'Click to show meteo';
+            controlDiv.appendChild(controlUI);
+
+            // Set CSS for the control interior.
+            var controlImg = document.createElement('img');
+            controlImg.src = "images/ShowMeteo.jpg";
+            controlImg.align = "middle";
+            controlUI.appendChild(controlImg);
+
+            controlUI.addEventListener('click', function() {
+                try {
+                    if (controlImg.src.match("Hide")) {
+                        resetData();
+                        if (infowindow) {
+                            infowindow.close();
+                        }
+                        if (listnerIdleEventHandler) {
+                            google.maps.event.removeListener(listnerIdleEventHandler);
+                        }
+                        if (listnerClickMeteoEventHandler) {
+                            google.maps.event.removeListener(listnerClickMeteoEventHandler);
+                        }
+                        controlImg.src = "images/ShowMeteo.jpg";
+
+                    } else {
+
+                        controlImg.src = 'images/HideMeteo.jpg';
+                        listnerIdleEventHandler = google.maps.event.addListener(map, 'idle', checkIfDataRequested);
+                        listnerClickMeteoEventHandler = map.data.addListener('click', showWeatherInfo);
+                        getCoords();
+                    }
+                } catch (err) {
+                    alert(err.message);
+                }
+            });
+
+        }
+
+        // Add interaction listeners to make weather requests
+
+        var showHideWeatherControlDiv = document.createElement('div');
+        showHideWeatherControlDiv.style.padding = "5px";
+        var showHideWeatherControl = new ShowHideWeatherControl(showHideWeatherControlDiv, map);
+
+        showHideWeatherControlDiv.index = 1;
+        map.controls[google.maps.ControlPosition.RIGHT_TOP].push(showHideWeatherControlDiv);
+
+        // FINE PATCH
 		if (this._maskOpts)
 			gmapsGapi.clearMask(this, this._maskOpts);
 

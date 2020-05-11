@@ -339,6 +339,7 @@ gmaps.Gmarker = zk.$extends(gmaps.Ginfo, {
 				isz? new google.maps.Size(isz[0], isz[1]) : null
 			);
 			opts.icon = markerImage;
+			opts.optimized = false;
 		}
 		if (isdw) {
 			var markerImage = new google.maps.MarkerImage(isdw,
